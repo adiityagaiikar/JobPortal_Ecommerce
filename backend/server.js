@@ -21,12 +21,30 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const clientOrigins = String(process.env.CLIENT_URL || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
 app.set('trust proxy', 1);
 
 app.use(
     cors({
-        origin: process.env.CLIENT_URL || '*',
+        origin: (origin, callback) => {
+            if (!origin) {
+                return callback(null, true);
+            }
+
+            if (process.env.NODE_ENV !== 'production') {
+                return callback(null, true);
+            }
+
+            if (clientOrigins.length === 0 || clientOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+
+            return callback(new Error(`CORS blocked for origin ${origin}`));
+        },
         credentials: true,
     })
 );
@@ -115,8 +133,8 @@ async function startServer() {
     await connectDB();
     await bootstrapData();
 
-    app.listen(PORT, () => {
-        console.log(`Backend running on http://localhost:${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Backend running on port ${PORT}`);
     });
 }
 
